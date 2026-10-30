@@ -1,70 +1,24 @@
 export type ResourceKey = 'oxygen' | 'water' | 'food' | 'power' | 'materials'
-export type ModuleId = 'solar' | 'battery' | 'recycler' | 'greenhouse' | 'shielding'
-export type ActionId = ModuleId | 'conserve' | 'repair'
-
-export type EventChoice = { id: string; label: string; detail: string; effects: Partial<Record<ResourceKey, number>>; safety: number }
+export type ModuleId = 'solar' | 'battery' | 'recycler' | 'shielding'
+export type ActionId = ModuleId | 'inspect' | 'science' | 'eva' | 'conserve' | 'repair'
+export type EventChoice = { id: string; label: string; detail: string; effects: Partial<Record<ResourceKey | 'research' | 'readiness', number>>; safety: number }
 export type MissionEvent = { id: string; title: string; description: string; severity: 'warning' | 'critical'; choices: EventChoice[] }
 export type LogEntry = { cycle: number; kind: 'system' | 'action' | 'event'; title: string; detail: string; tone?: 'good' | 'warning' | 'critical' }
-export type MissionState = {
-  cycle: number; oxygen: number; water: number; food: number; power: number; materials: number
-  safety: number; integrity: number; research: number; efficiency: number; status: 'active' | 'success' | 'failed'
-  modules: ModuleId[]; queued: { id: ModuleId; readyCycle: number }[]; pendingEvent: MissionEvent | null; log: LogEntry[]
+export type MissionState = { cycle:number; oxygen:number; water:number; food:number; power:number; materials:number; safety:number; integrity:number; research:number; efficiency:number; readiness:number; status:'active'|'success'|'failed'; modules:ModuleId[]; queued:{id:ModuleId;readyCycle:number}[]; pendingEvent:MissionEvent|null; log:LogEntry[]; objectives:{label:string;done:boolean}[] }
+export const moduleCatalog: Record<ModuleId,{name:string;description:string;cost:Partial<Record<ResourceKey,number>>;effect:string;delay:number}> = {
+ solar:{name:'Solar array',description:'Improves generation during illuminated cycles.',cost:{materials:20,power:4},effect:'+8 generation',delay:1}, battery:{name:'Battery bank',description:'Extends reserve capacity for dark periods.',cost:{materials:18,power:3},effect:'+24 reserve capacity',delay:1}, recycler:{name:'Water recovery loop',description:'Recovers potable water from humidity and hygiene waste.',cost:{materials:22,power:5},effect:'18% recovery efficiency',delay:1}, shielding:{name:'Storm shelter',description:'Creates a protected zone for radiation alerts.',cost:{materials:28},effect:'reduces exposure during alerts',delay:2}
 }
-
-export const moduleCatalog: Record<ModuleId, { name: string; description: string; cost: Partial<Record<ResourceKey, number>>; effect: string; delay: number }> = {
-  solar: { name: 'Solar array', description: 'Adds dependable daytime generation.', cost: { materials: 22, power: 4 }, effect: '+9 power generated per cycle', delay: 1 },
-  battery: { name: 'Battery bank', description: 'Stores surplus power for dark cycles.', cost: { materials: 18, power: 2 }, effect: '+18 power reserve capacity', delay: 1 },
-  recycler: { name: 'Water recycler', description: 'Recovers water from crew systems.', cost: { materials: 20, power: 5 }, effect: '+14 water recovered per cycle', delay: 1 },
-  greenhouse: { name: 'Greenhouse', description: 'Grows fresh food and supports morale.', cost: { materials: 25, water: 8, power: 6 }, effect: '+8 food per cycle', delay: 2 },
-  shielding: { name: 'Habitat shielding', description: 'Improves protection from dust and weather.', cost: { materials: 28 }, effect: '+12 habitat integrity', delay: 2 },
-}
-
-const eventDeck: MissionEvent[] = [
-  { id: 'leak', title: 'Water loop leak', description: 'A pressure reading is falling in the secondary water loop. The crew can hear a faint hiss behind the service panel.', severity: 'critical', choices: [
-    { id: 'repair', label: 'Repair immediately', detail: 'Spend materials to isolate the leak.', effects: { materials: -12, water: 8 }, safety: 5 },
-    { id: 'ration', label: 'Ration water', detail: 'Buy time while preserving construction stock.', effects: { water: -8, safety: -2 }, safety: 0 },
-  ]},
-  { id: 'weather', title: 'Space-weather alert', description: 'A fast solar particle event is expected during the next cycle. Exposed systems need attention.', severity: 'warning', choices: [
-    { id: 'shelter', label: 'Shelter the crew', detail: 'Conserve power and protect the habitat.', effects: { power: -5 }, safety: 4 },
-    { id: 'continue', label: 'Continue operations', detail: 'Keep the greenhouse running, accept added exposure.', effects: { food: 5 }, safety: -5 },
-  ]},
-  { id: 'fault', title: 'Battery controller fault', description: 'The charge controller is reporting intermittent faults. Stored energy may be unavailable.', severity: 'warning', choices: [
-    { id: 'bypass', label: 'Run a safe bypass', detail: 'Lose some materials and power to stabilize it.', effects: { materials: -8, power: -6 }, safety: 3 },
-    { id: 'defer', label: 'Defer maintenance', detail: 'Keep the system online for now.', effects: { power: -10 }, safety: -3 },
-  ]},
+const events: MissionEvent[] = [
+ {id:'dust',title:'Lunar dust intrusion',description:'A seal inspection reports abrasive regolith inside the airlock vestibule. The next EVA could spread contamination into the habitat.',severity:'warning',choices:[{id:'clean',label:'Run a full decontamination',detail:'Use materials and time to protect the habitat seals.',effects:{materials:-8,power:-3},safety:5},{id:'limit',label:'Limit airlock cycles',detail:'Suspend non-essential surface operations until the next inspection.',effects:{research:-2},safety:1}]},
+ {id:'radiation',title:'Solar-particle alert',description:'A fast radiation front is expected in the next operating window. The crew needs a deliberate shelter decision.',severity:'critical',choices:[{id:'shelter',label:'Prepare the storm shelter',detail:'Suspend science and move the crew into protected operations.',effects:{power:-7,food:-2},safety:8},{id:'expose',label:'Continue surface work',detail:'Complete the sample traverse, accepting additional exposure.',effects:{research:8,readiness:-12},safety:-12}]},
+ {id:'water',title:'Water recovery anomaly',description:'The recovery loop is cycling below its expected efficiency. Reserve projections have dropped by one cycle.',severity:'critical',choices:[{id:'repair',label:'Repair the recovery loop',detail:'Spend spare parts to restore filtration performance.',effects:{materials:-12,power:-4},safety:7},{id:'ration',label:'Apply crew rationing',detail:'Reduce discretionary water use while diagnostics continue.',effects:{water:-5,readiness:-3},safety:1}]}
 ]
-
-export function createInitialState(): MissionState { return { cycle: 1, oxygen: 86, water: 72, food: 64, power: 48, materials: 76, safety: 92, integrity: 88, research: 0, efficiency: 82, status: 'active', modules: [], queued: [], pendingEvent: null, log: [{ cycle: 1, kind: 'system', title: 'Mission initialized', detail: 'Four crew members are awake and the outpost is nominal.' }] } }
-
-function clamp(n: number, min = 0, max = 100) { return Math.max(min, Math.min(max, Math.round(n))) }
-function applyEffects(state: MissionState, effects: Partial<Record<ResourceKey, number>>) { for (const key of Object.keys(effects) as ResourceKey[]) state[key] = clamp(state[key] + (effects[key] ?? 0)) }
-
-export function validateAction(state: MissionState, action: ActionId) {
-  if (action in moduleCatalog && (state.modules.includes(action as ModuleId) || state.queued.some(q => q.id === action))) return 'That module is already active or under construction.'
-  if (action in moduleCatalog) { const cost = moduleCatalog[action as ModuleId].cost; for (const key of Object.keys(cost) as ResourceKey[]) if (state[key] < (cost[key] ?? 0)) return `Not enough ${key} for this build.` }
-  return null
-}
-
-export function chooseEvent(state: MissionState, choiceId: string): MissionState {
-  if (!state.pendingEvent) return state
-  const choice = state.pendingEvent.choices.find(c => c.id === choiceId); if (!choice) return state
-  const next = structuredClone(state); applyEffects(next, choice.effects); next.safety = clamp(next.safety + choice.safety); next.research += 6; next.log.push({ cycle: next.cycle, kind: 'event', title: `${next.pendingEvent.title}: ${choice.label}`, detail: choice.detail, tone: choice.safety >= 0 ? 'good' : 'warning' }); next.pendingEvent = null; return next
-}
-
-export function advanceCycle(input: MissionState, action: ActionId | null): MissionState {
-  const next = structuredClone(input); if (next.status !== 'active' || next.pendingEvent) return next
-  if (action) { const error = validateAction(next, action); if (error) { next.log.push({ cycle: next.cycle, kind: 'system', title: 'Action unavailable', detail: error, tone: 'warning' }); return next }
-    if (action in moduleCatalog) { const mod = moduleCatalog[action as ModuleId]; for (const key of Object.keys(mod.cost) as ResourceKey[]) next[key] = clamp(next[key] - (mod.cost[key] ?? 0)); next.queued.push({ id: action as ModuleId, readyCycle: next.cycle + mod.delay }); next.log.push({ cycle: next.cycle, kind: 'action', title: `${mod.name} scheduled`, detail: `Construction completes in ${mod.delay} cycle${mod.delay > 1 ? 's' : ''}.` }) }
-    if (action === 'conserve') { next.efficiency = clamp(next.efficiency + 5); next.power = clamp(next.power + 8); next.log.push({ cycle: next.cycle, kind: 'action', title: 'Power conservation enabled', detail: 'Non-critical systems are throttled for this cycle.' }) }
-    if (action === 'repair') { next.materials = clamp(next.materials - 8); next.integrity = clamp(next.integrity + 8); next.log.push({ cycle: next.cycle, kind: 'action', title: 'Preventive repair complete', detail: 'Habitat integrity improved before the next cycle.' }) }
-  }
-  next.cycle += 1
-  next.queued = next.queued.filter(q => { if (q.readyCycle <= next.cycle) { next.modules.push(q.id); next.log.push({ cycle: next.cycle, kind: 'system', title: `${moduleCatalog[q.id].name} commissioned`, detail: moduleCatalog[q.id].effect, tone: 'good' }); return false } return true })
-  const generation = 12 + (next.modules.includes('solar') ? 9 : 0); const demand = 18 + (next.modules.includes('recycler') ? 4 : 0) + (next.modules.includes('greenhouse') ? 5 : 0); const battery = next.modules.includes('battery') ? 18 : 0; const delta = generation - demand; next.power = clamp(next.power + delta, 0, 100 + battery)
-  next.oxygen = clamp(next.oxygen - 7); next.water = clamp(next.water - 9 + (next.modules.includes('recycler') ? 14 : 0)); next.food = clamp(next.food - 8 + (next.modules.includes('greenhouse') ? 8 : 0)); next.integrity = clamp(next.integrity + (next.modules.includes('shielding') ? 1 : -1)); next.safety = clamp(next.safety + (next.power < 12 ? -8 : 1) + (next.water < 25 ? -8 : 0)); next.research += 3
-  if (next.cycle % 3 === 0) next.pendingEvent = eventDeck[(Math.floor(next.cycle / 3) - 1) % eventDeck.length]
-  if (next.water <= 0 || next.oxygen <= 0 || next.food <= 0 || next.safety <= 0 || next.integrity <= 0) { next.status = 'failed'; next.log.push({ cycle: next.cycle, kind: 'system', title: 'Mission ended', detail: 'A critical resource or safety threshold was crossed.', tone: 'critical' }) }
-  else if (next.cycle >= 10) { next.status = 'success'; next.log.push({ cycle: next.cycle, kind: 'system', title: 'Mission objective complete', detail: 'The outpost survived the training window.', tone: 'good' }) }
-  else next.log.push({ cycle: next.cycle, kind: 'system', title: 'Cycle complete', detail: `Generation ${generation} · demand ${demand} · net power ${delta >= 0 ? '+' : ''}${delta}.` })
-  return next
-}
+export function createInitialState():MissionState{return{cycle:1,oxygen:88,water:64,food:68,power:42,materials:62,safety:91,integrity:86,research:0,efficiency:78,readiness:94,status:'active',modules:[],queued:[],pendingEvent:null,log:[{cycle:1,kind:'system',title:'Surface operations initialized',detail:'Two astronauts are awake. Essential systems are online at the lunar south pole.'}],objectives:[{label:'Complete habitat systems check',done:false},{label:'Collect a polar regolith sample',done:false},{label:'Maintain crew safety above 60%',done:false}]}}
+const clamp=(n:number,min=0,max=100)=>Math.max(min,Math.min(max,Math.round(n)))
+function canPay(s:MissionState,cost:Partial<Record<ResourceKey,number>>){return Object.entries(cost).every(([key,value])=>s[key as ResourceKey]>=(value??0))}
+function apply(s:MissionState,e:Partial<Record<ResourceKey | 'research' | 'readiness',number>>){for(const [key,value] of Object.entries(e)){if(key==='research'||key==='readiness')s[key]=clamp(s[key]+(value??0));else if(key in s)s[key as ResourceKey]=clamp(s[key as ResourceKey]+(value??0))}}
+export function getAvailableActions(s:MissionState):ActionId[]{const actions:ActionId[]=['inspect','science','eva','conserve','repair']; for(const id of Object.keys(moduleCatalog) as ModuleId[])if(!s.modules.includes(id)&&!s.queued.some(q=>q.id===id)&&canPay(s,moduleCatalog[id].cost))actions.push(id); return actions}
+export function validateAction(s:MissionState,a:ActionId){if(!getAvailableActions(s).includes(a))return 'This operation is not available with the current crew, systems, or reserves.';return null}
+export function chooseEvent(input:MissionState,id:string){if(!input.pendingEvent)return input;const event=input.pendingEvent;const s=structuredClone(input),c=event.choices.find(x=>x.id===id);if(!c)return s;apply(s,c.effects);s.safety=clamp(s.safety+c.safety);s.pendingEvent=null;s.log.push({cycle:s.cycle,kind:'event',title:`${event.title}: ${c.label}`,detail:c.detail,tone:c.safety>=0?'good':'warning'});return s}
+export function advanceCycle(input:MissionState,a:ActionId|null):MissionState{const s=structuredClone(input);if(s.status!=='active'||s.pendingEvent)return s;if(a){const err=validateAction(s,a);if(err){s.log.push({cycle:s.cycle,kind:'system',title:'Operation unavailable',detail:err,tone:'warning'});return s}if(a in moduleCatalog){const m=moduleCatalog[a as ModuleId];apply(s,Object.fromEntries(Object.entries(m.cost).map(([k,v])=>[k,-(v??0)])));s.queued.push({id:a as ModuleId,readyCycle:s.cycle+m.delay});s.log.push({cycle:s.cycle,kind:'action',title:`${m.name} scheduled`,detail:`Commissioning in ${m.delay} cycle${m.delay>1?'s':''}.`})}if(a==='inspect'){s.objectives[0].done=true;s.readiness=clamp(s.readiness+2);s.log.push({cycle:s.cycle,kind:'action',title:'Habitat systems check complete',detail:'Pressure, air revitalization, thermal loops, and water lines are nominal.',tone:'good'})}if(a==='science'||a==='eva'){s.research+=a==='eva'?10:6;s.objectives[1].done=a==='eva';s.power=clamp(s.power-4);s.readiness=clamp(s.readiness-(a==='eva'?7:2));s.log.push({cycle:s.cycle,kind:'action',title:a==='eva'?'Sample traverse complete':'Science package prepared',detail:a==='eva'?'A polar regolith sample was secured. Dust exposure increased maintenance load.':'The instrument suite is calibrated for the next window.',tone:'good'})}if(a==='conserve'){s.efficiency=clamp(s.efficiency+4);s.power=clamp(s.power+7);s.log.push({cycle:s.cycle,kind:'action',title:'Essential loads prioritized',detail:'Non-critical science and habitat loads were throttled for this cycle.'})}if(a==='repair'){s.materials=clamp(s.materials-7);s.integrity=clamp(s.integrity+7);s.log.push({cycle:s.cycle,kind:'action',title:'Preventive maintenance complete',detail:'Crew inspected seals, filters, and thermal interfaces.',tone:'good'})}}
+ s.cycle++;s.queued=s.queued.filter(q=>{if(q.readyCycle<=s.cycle){s.modules.push(q.id);s.log.push({cycle:s.cycle,kind:'system',title:`${moduleCatalog[q.id].name} commissioned`,detail:moduleCatalog[q.id].effect,tone:'good'});return false}return true});const generation=10+(s.modules.includes('solar')?8:0),demand=15+(s.modules.includes('recycler')?3:0)+(s.modules.includes('shielding')?2:0);const net=generation-demand;s.power=clamp(s.power+net,0,s.modules.includes('battery')?124:100);s.oxygen=clamp(s.oxygen-6+(s.power>10?2:0));s.water=clamp(s.water-8+(s.modules.includes('recycler')?5:0));s.food=clamp(s.food-7);s.integrity=clamp(s.integrity-(s.modules.includes('shielding')?0:1));s.safety=clamp(s.safety+(s.power<10?-8:1)+(s.water<22?-7:0));s.objectives[2].done=s.safety>=60;s.research+=2;if(Math.random()<0.62||s.cycle%3===0){const event=events[Math.floor(Math.random()*events.length)];s.pendingEvent=structuredClone(event)}if(s.oxygen<=0||s.water<=0||s.food<=0||s.safety<=0||s.integrity<=0){s.status='failed';s.log.push({cycle:s.cycle,kind:'system',title:'Mission aborted',detail:'A critical crew or habitat threshold was crossed.',tone:'critical'})}else if(s.cycle>=8){s.status='success';s.log.push({cycle:s.cycle,kind:'system',title:'Surface objectives secured',detail:'The crew completed the training window and is ready for ascent preparation.',tone:'good'})}else s.log.push({cycle:s.cycle,kind:'system',title:'Cycle report filed',detail:`Power ${generation} generated / ${demand} demanded · reserves updated.`});return s}
